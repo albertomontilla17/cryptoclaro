@@ -896,6 +896,7 @@ function toggleCard(header) {
 
 // ─── COUNTRY GUIDE ───────────────────────────────────────
 function showCountry(code) {
+  currentCountry = countries[code]?.title?.split('—')[0]?.trim() || code;
   const c = countries[code];
   document.getElementById('guide-flag').textContent = c.flag;
   document.getElementById('guide-title').textContent = c.title;
@@ -959,9 +960,28 @@ function goToChat(q) {
   document.getElementById('char-count').textContent = q.length + ' caracteres';
 }
 
+// ─── GOOGLE SHEETS LOGGING ───────────────────────────────
+const SHEET_URL = 'https://script.google.com/macros/s/AKfycbxa2p3Lc1VCBuSIeki7K-9iAqeNaFUukNx_yeG2kIjrjR5yIOCkEkrOPqM7YQ9ExzF_JA/exec';
+let currentCountry = 'No especificado';
+
+async function logToSheet(question, answer) {
+  try {
+    const form = new FormData();
+    form.append('question', question);
+    form.append('answer', answer);
+    form.append('country', currentCountry);
+    await fetch(SHEET_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      body: form
+    });
+  } catch(e) { /* silencioso — no interrumpe la app */ }
+}
+
 // ─── CHAT ────────────────────────────────────────────────
 const textarea = document.getElementById('question');
 const charCount = document.getElementById('char-count');
+let conversationHistory = [];
 
 textarea.addEventListener('input', () => {
   charCount.textContent = textarea.value.length + ' caracteres';
@@ -1017,6 +1037,8 @@ async function askQuestion() {
   textarea.value = '';
   charCount.textContent = '0 caracteres';
   addTyping();
+
+  conversationHistory.push({ role: 'user', content: q });
 
   const system = `Eres CryptoClaro, el asistente de referencia para latinoamericanos que quieren entender y usar crypto para proteger sus ahorros de la inflación. Eres claro, honesto y hablas como un amigo que sabe del tema — no como un profesor ni como un vendedor.
 
@@ -1120,21 +1142,19 @@ TU ESTILO DE RESPUESTA
 - NUNCA prometas ganancias ni recomiendes proyectos específicos como inversión`;
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        system,
-        messages: [{ role: 'user', content: q }]
-      })
+      body: JSON.stringify({ system, messages: conversationHistory })
     });
     const data = await res.json();
     const answer = data.content?.[0]?.text || 'Hubo un error. Intenta de nuevo.';
+    conversationHistory.push({ role: 'assistant', content: answer });
     document.getElementById('typing-indicator')?.remove();
     addMessage(answer, 'bot');
+    logToSheet(q, answer);
   } catch {
+    conversationHistory.pop(); // quita el mensaje que falló
     document.getElementById('typing-indicator')?.remove();
     addMessage('No se pudo conectar. Revisa tu conexión e intenta de nuevo.', 'bot');
   }
