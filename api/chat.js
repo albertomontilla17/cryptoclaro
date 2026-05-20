@@ -9,40 +9,45 @@ export default async function handler(req, res) {
   try {
     const { messages, system } = req.body;
 
-    // Obtener tasas en tiempo real de CoinGecko
+    // Obtener tasas en tiempo real
     let ratesContext = '';
     try {
-      const ratesRes = await fetch(
-        'https://api.coingecko.com/api/v3/simple/price?ids=tether,bitcoin,ethereum&vs_currencies=usd,ves,cop,ars,mxn'
+      // CoinGecko para BTC, ETH, y monedas latam (excepto VES)
+      const geckoRes = await fetch(
+        'https://api.coingecko.com/api/v3/simple/price?ids=tether,bitcoin,ethereum&vs_currencies=usd,cop,ars,mxn'
       );
-      const rates = await ratesRes.json();
+      const gecko = await geckoRes.json();
 
-      const usdtVes = rates?.tether?.ves;
-      const usdtCop = rates?.tether?.cop;
-      const usdtArs = rates?.tether?.ars;
-      const usdtMxn = rates?.tether?.mxn;
-      const btcUsd = rates?.bitcoin?.usd;
-      const ethUsd = rates?.ethereum?.usd;
+      // Yadio.io para la tasa bolívar venezolano (agrega P2P en tiempo real)
+      const yadioRes = await fetch('https://yadio.io/api/v1/exchangerates/usd');
+      const yadio = await yadioRes.json();
+      const usdtVes = yadio?.USD?.VES || null;
+
+      const usdtCop = gecko?.tether?.cop;
+      const usdtArs = gecko?.tether?.ars;
+      const usdtMxn = gecko?.tether?.mxn;
+      const btcUsd  = gecko?.bitcoin?.usd;
+      const ethUsd  = gecko?.ethereum?.usd;
 
       ratesContext = `
 ═══════════════════════════════
 TASAS DE CAMBIO EN TIEMPO REAL (actualizado ahora)
 ═══════════════════════════════
-1 USDT = ${usdtVes ? usdtVes.toLocaleString('es-VE') + ' bolívares (VES)' : 'no disponible'}
-1 USDT = ${usdtCop ? usdtCop.toLocaleString('es-CO') + ' pesos colombianos (COP)' : 'no disponible'}
-1 USDT = ${usdtArs ? usdtArs.toLocaleString('es-AR') + ' pesos argentinos (ARS)' : 'no disponible'}
-1 USDT = ${usdtMxn ? usdtMxn.toLocaleString('es-MX') + ' pesos mexicanos (MXN)' : 'no disponible'}
-1 Bitcoin = ${btcUsd ? '$' + btcUsd.toLocaleString('en-US') + ' USD' : 'no disponible'}
-1 Ethereum = ${ethUsd ? '$' + ethUsd.toLocaleString('en-US') + ' USD' : 'no disponible'}
+1 USDT / 1 USD = ${usdtVes  ? usdtVes.toLocaleString('es-VE')  + ' bolívares venezolanos (VES)' : 'no disponible'}
+1 USDT / 1 USD = ${usdtCop  ? usdtCop.toLocaleString('es-CO')  + ' pesos colombianos (COP)'     : 'no disponible'}
+1 USDT / 1 USD = ${usdtArs  ? usdtArs.toLocaleString('es-AR')  + ' pesos argentinos (ARS)'      : 'no disponible'}
+1 USDT / 1 USD = ${usdtMxn  ? usdtMxn.toLocaleString('es-MX')  + ' pesos mexicanos (MXN)'       : 'no disponible'}
+1 Bitcoin (BTC) = ${btcUsd  ? '$' + btcUsd.toLocaleString('en-US') + ' USD'                      : 'no disponible'}
+1 Ethereum (ETH) = ${ethUsd ? '$' + ethUsd.toLocaleString('en-US') + ' USD'                      : 'no disponible'}
 
-Usa estas tasas para hacer cálculos cuando el usuario pregunte por valores o conversiones. 
-Aclara siempre que la tasa varía constantemente y que esta es una referencia del momento.
+Cuando el usuario pregunte por valores o conversiones, usa estas tasas para hacer cálculos exactos.
+Aclara siempre que la tasa varía constantemente y que esta es una referencia del momento actual.
+Si el usuario da una cantidad en bolívares, pesos u otra moneda, convierte usando estas tasas.
 `;
     } catch {
       ratesContext = '\nNota: No se pudieron obtener las tasas en tiempo real en este momento.\n';
     }
 
-    // Llamar a Claude con el contexto de tasas inyectado
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
