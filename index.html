@@ -1027,15 +1027,54 @@ function addTyping() {
   msgs.scrollTop = msgs.scrollHeight;
 }
 
+// ─── LÍMITE DIARIO ───────────────────────────────────────
+const DAILY_LIMIT = 10;
+
+function getUsage() {
+  const today = new Date().toDateString();
+  const stored = JSON.parse(localStorage.getItem('cc_usage') || '{}');
+  if (stored.date !== today) return { date: today, count: 0 };
+  return stored;
+}
+
+function incrementUsage() {
+  const usage = getUsage();
+  usage.count++;
+  localStorage.setItem('cc_usage', JSON.stringify(usage));
+  return usage.count;
+}
+
+function getRemainingQuestions() {
+  return Math.max(0, DAILY_LIMIT - getUsage().count);
+}
+
+function updateCounter() {
+  const remaining = getRemainingQuestions();
+  const el = document.getElementById('char-count');
+  if (el) el.textContent = `${remaining} preguntas restantes hoy`;
+}
+
+// ─── DETECCIÓN DE ESPAÑOL ────────────────────────────────
+
 async function askQuestion() {
   const q = textarea.value.trim();
   if (!q) return;
 
   const btn = document.getElementById('send-btn');
+
+  // Verificar límite diario
+  if (getRemainingQuestions() <= 0) {
+    addMessage('Has alcanzado el límite de 10 preguntas por hoy. **Vuelve mañana** para seguir aprendiendo sobre crypto. 🌅', 'bot');
+    textarea.value = '';
+    charCount.textContent = '0 preguntas restantes hoy';
+    return;
+  }
+
   btn.disabled = true;
   addMessage(q, 'user');
   textarea.value = '';
-  charCount.textContent = '0 caracteres';
+  incrementUsage();
+  updateCounter();
   addTyping();
 
   conversationHistory.push({ role: 'user', content: q });
@@ -1165,6 +1204,9 @@ TU ESTILO DE RESPUESTA
 textarea.addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); askQuestion(); }
 });
+
+// Inicializar contador al cargar
+updateCounter();
 </script>
 </body>
 </html>
