@@ -37,9 +37,9 @@ CryptoClaro resuelve eso. Es una web app que combina:
 - **Frontend:** HTML, CSS, JavaScript vanilla
 - **Backend:** Vercel Serverless Functions (Node.js)
 - **IA:** Claude API (Anthropic) — claude-sonnet-4-5
+- **Tasas en tiempo real:** CoinGecko API + Yadio.io (VES)
 - **Analytics:** Google Sheets via Apps Script
 - **Deploy:** Vercel + GitHub CI/CD
-
 ---
 
 ## Características
