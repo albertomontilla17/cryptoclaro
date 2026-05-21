@@ -19,9 +19,9 @@ export default async function handler(req, res) {
       const gecko = await geckoRes.json();
 
       // Yadio.io para la tasa bolívar venezolano (agrega P2P en tiempo real)
-      const yadioRes = await fetch('https://api.yadio.io/rate/VES/USD');
+      const yadioRes = await fetch('https://yadio.io/json');
       const yadio = await yadioRes.json();
-      const usdtVes = yadio?.rate ? (1 / yadio.rate) : null;
+      const usdtVes = yadio?.USD?.VES || null;
 
       const usdtCop = gecko?.tether?.cop;
       const usdtArs = gecko?.tether?.ars;
